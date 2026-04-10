@@ -1,0 +1,28 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: go-and-eat-postgres
+    environment:
+      POSTGRES_USER: go_and_eat
+      POSTGRES_PASSWORD: secret
+      POSTGRES_DB: go_and_eat
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - go-and-eat-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U go_and_eat -d go_and_eat"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      
+networks:
+  go-and-eat-network:
+    driver: bridge
+
+volumes:
+  postgres_data:

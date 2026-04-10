@@ -1,0 +1,16 @@
+server:
+  port: 8081
+  read_timeout: 5s
+  write_timeout: 10s
+  idle_timeout: 120s
+
+database:
+  host: localhost
+  port: 5432
+  user: go_and_eat
+  password: secret
+  dbname: go_and_eat
+  sslmode: disable
+  max_open_conns: 25
+  max_idle_conns: 5
+  conn_max_lifetime: 5m
