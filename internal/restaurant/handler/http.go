@@ -10,7 +10,7 @@ import (
 )
 
 type RestaurantHandler struct {
-	storage *storage.MemoryStorage
+	storage *storage.PostgresStorage
 }
 
 type CreateRestaurantRequest struct {
@@ -29,7 +29,7 @@ type AddMenuItemRequest struct {
 	Available   bool   `json:"available"`
 }
 
-func NewRestaurantHandler(storage *storage.MemoryStorage) *RestaurantHandler {
+func NewRestaurantHandler(storage *storage.PostgresStorage) *RestaurantHandler {
 	return &RestaurantHandler{
 		storage: storage,
 	}
