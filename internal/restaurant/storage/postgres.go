@@ -118,18 +118,11 @@ func (s *PostgresStorage) AddMenuItem(item domain.MenuItem) error {
 	return nil
 }
 
-func (s *PostgresStorage) DecreaseStock(restaurantID, menuItemID string, quantity int) error {
-	ctx := context.Background()
-
-	tx, err := s.pool.Begin(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to begin transaction: %w", err)
-	}
-	defer tx.Rollback(ctx)
-
+func (s *PostgresStorage) DecreaseStockWithTx(ctx context.Context, tx pgx.Tx, restaurantID, menuItemID string, quantity int) error {
 	var currentStock int
+
 	checkQuery := `SELECT stock FROM menu_items WHERE id = $1 AND restaurant_id = $2`
-	err = tx.QueryRow(ctx, checkQuery, menuItemID, restaurantID).Scan(&currentStock)
+	err := tx.QueryRow(ctx, checkQuery, menuItemID, restaurantID).Scan(&currentStock)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return errors.New("menu item not found")
@@ -157,20 +150,14 @@ func (s *PostgresStorage) DecreaseStock(restaurantID, menuItemID string, quantit
 		return errors.New("menu item not found")
 	}
 
-	if err := tx.Commit(ctx); err != nil {
-		return fmt.Errorf("failed to commit transaction: %w", err)
-	}
-
 	return nil
 }
 
-func (s *PostgresStorage) CheckAvailability(restaurantID string, items []struct {
+func (s *PostgresStorage) CheckAvailabilityWithTx(ctx context.Context, tx pgx.Tx, restaurantID string, items []struct {
 	ID       string
 	Quantity int
 },
 ) (bool, error) {
-	ctx := context.Background()
-
 	for _, item := range items {
 		var hasStock bool
 		query := `
@@ -178,7 +165,7 @@ func (s *PostgresStorage) CheckAvailability(restaurantID string, items []struct 
 			FROM menu_items
 			WHERE id = $2 AND restaurant_id = $3
 		`
-		err := s.pool.QueryRow(ctx, query, item.Quantity, item.ID, restaurantID).Scan(&hasStock)
+		err := tx.QueryRow(ctx, query, item.Quantity, item.ID, restaurantID).Scan(&hasStock)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
 				return false, nil // Блюдо не найдено, считаем его недоступным

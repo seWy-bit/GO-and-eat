@@ -37,14 +37,14 @@ func (o *Order) CalculateTotal() int64 {
 	return total
 }
 
-func (o *Order) CanTransitionTo(newStatus OrderStatus) bool {
+func (os OrderStatus) CanTransitionTo(newStatus OrderStatus) bool {
 	transitions := map[OrderStatus][]OrderStatus{
 		OrderStatusCreated:   {OrderStatusConfirmed, OrderStatusCancelled},
 		OrderStatusConfirmed: {OrderStatusCancelled},
 		OrderStatusCancelled: {},
 	}
 
-	for _, allowed := range transitions[o.Status] {
+	for _, allowed := range transitions[os] {
 		if allowed == newStatus {
 			return true
 		}

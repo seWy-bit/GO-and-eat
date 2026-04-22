@@ -14,6 +14,7 @@ CREATE TABLE IF NOT EXISTS orders (
 CREATE TABLE IF NOT EXISTS order_items (
     id TEXT PRIMARY KEY,
     order_id TEXT NOT NULL,
+    name TEXT NOT NULL DEFAULT '',
     menu_item_id TEXT NOT NULL,
     quantity INTEGER NOT NULL,
     price BIGINT NOT NULL,

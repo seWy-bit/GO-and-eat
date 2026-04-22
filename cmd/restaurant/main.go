@@ -59,8 +59,8 @@ func main() {
 	restaurantStore := restaurantStorage.NewPostgresStorage(pool.Pool)
 	restaurantHandlers := restaurantHandler.NewRestaurantHandler(restaurantStore)
 
-	orderStore := orderStorage.NewMemoryOrderStorage()
-	createOrderUseCase := orderUsecase.NewCreateOrderUseCase(orderStore, restaurantStore)
+	orderStore := orderStorage.NewPostgresOrderStorage(pool.Pool)
+	createOrderUseCase := orderUsecase.NewCreateOrderUseCase(orderStore, restaurantStore, pool.Pool)
 	orderHandlers := orderHandler.NewOrderHandler(createOrderUseCase)
 
 	http.HandleFunc("POST /restaurants", restaurantHandlers.CreateRestaurant)
@@ -70,7 +70,7 @@ func main() {
 	http.HandleFunc("POST /orders", orderHandlers.CreateOrder)
 
 	server := &http.Server{
-		Addr:         fmt.Sprint(":%d", cfg.Server.Port),
+		Addr:         fmt.Sprintf(":%d", cfg.Server.Port),
 		ReadTimeout:  cfg.Server.ReadTimeout,
 		WriteTimeout: cfg.Server.WriteTimeout,
 		IdleTimeout:  cfg.Server.IdleTimeout,
