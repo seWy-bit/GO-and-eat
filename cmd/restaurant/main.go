@@ -61,13 +61,27 @@ func main() {
 
 	orderStore := orderStorage.NewPostgresOrderStorage(pool.Pool)
 	createOrderUseCase := orderUsecase.NewCreateOrderUseCase(orderStore, restaurantStore, pool.Pool)
-	orderHandlers := orderHandler.NewOrderHandler(createOrderUseCase)
+	getOrderUseCase := orderUsecase.NewGetOrderUseCase(orderStore)
+	updateOrderStatusUseCase := orderUsecase.NewUpdateOrderStatusUseCase(orderStore)
+	getUserOrdersUseCase := orderUsecase.NewGetUserOrdersUseCase(orderStore)
 
+	orderHandlers := orderHandler.NewOrderHandler(
+		createOrderUseCase,
+		getOrderUseCase,
+		updateOrderStatusUseCase,
+		getUserOrdersUseCase,
+	)
+
+	// Restaurant endpoints
 	http.HandleFunc("POST /restaurants", restaurantHandlers.CreateRestaurant)
 	http.HandleFunc("GET /restaurants/{id}/menu", restaurantHandlers.GetMenu)
 	http.HandleFunc("POST /restaurants/{id}/menu", restaurantHandlers.AddMenuItem)
 
+	// Order endpoints
 	http.HandleFunc("POST /orders", orderHandlers.CreateOrder)
+	http.HandleFunc("GET /orders/{id}", orderHandlers.GetOrder)
+	http.HandleFunc("PATCH /orders/{id}/status", orderHandlers.UpdateOrderStatus)
+	http.HandleFunc("GET /orders/user/{user_id}", orderHandlers.GetUserOrders)
 
 	server := &http.Server{
 		Addr:         fmt.Sprintf(":%d", cfg.Server.Port),

@@ -124,25 +124,19 @@ func (s *PostgresOrderStorage) GetOrder(ctx context.Context, id string) (domain.
 }
 
 func (s *PostgresOrderStorage) UpdateOrderStatus(ctx context.Context, id string, newStatus domain.OrderStatus) error {
-	var currentStatusStr string
-	query := `SELECT status FROM orders WHERE id = $1`
-	err := s.pool.QueryRow(ctx, query, id).Scan(&currentStatusStr)
-	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return errors.New("order not found")
-		}
-		return fmt.Errorf("failed to get order status: %w", err)
-	}
+	updateQuery := `
+        UPDATE orders 
+        SET status = $1, updated_at = NOW() 
+        WHERE id = $2
+    `
 
-	currentStatus := domain.OrderStatus(currentStatusStr)
-	if !currentStatus.CanTransitionTo(newStatus) {
-		return fmt.Errorf("invalid status transition: %s -> %s", currentStatus, newStatus)
-	}
-
-	updateQuery := `UPDATE orders SET status = $1, updated_at = NOW() WHERE id = $2`
-	_, err = s.pool.Exec(ctx, updateQuery, string(newStatus), id)
+	cmdTag, err := s.pool.Exec(ctx, updateQuery, string(newStatus), id)
 	if err != nil {
 		return fmt.Errorf("failed to update order status: %w", err)
+	}
+
+	if cmdTag.RowsAffected() == 0 {
+		return errors.New("order not found")
 	}
 
 	return nil

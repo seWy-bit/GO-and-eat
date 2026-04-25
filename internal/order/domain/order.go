@@ -8,6 +8,10 @@ const (
 	OrderStatusCreated   OrderStatus = "created"
 	OrderStatusConfirmed OrderStatus = "confirmed"
 	OrderStatusCancelled OrderStatus = "cancelled"
+	OrderStatusCooking   OrderStatus = "cooking"
+	OrderStatusReady     OrderStatus = "ready"
+	OrderStatusDelivered OrderStatus = "delivering"
+	OrderStatusCompleted OrderStatus = "completed"
 )
 
 type Order struct {
@@ -37,18 +41,41 @@ func (o *Order) CalculateTotal() int64 {
 	return total
 }
 
-func (os OrderStatus) CanTransitionTo(newStatus OrderStatus) bool {
-	transitions := map[OrderStatus][]OrderStatus{
-		OrderStatusCreated:   {OrderStatusConfirmed, OrderStatusCancelled},
-		OrderStatusConfirmed: {OrderStatusCancelled},
-		OrderStatusCancelled: {},
+func (o *Order) CanTransitionTo(newStatus OrderStatus) bool {
+	if o.Status == newStatus {
+		return true
 	}
 
-	for _, allowed := range transitions[os] {
+	if o.IsFinal() {
+		return false
+	}
+
+	transitions := map[OrderStatus][]OrderStatus{
+		OrderStatusCreated:   {OrderStatusConfirmed, OrderStatusCancelled},
+		OrderStatusConfirmed: {OrderStatusCancelled, OrderStatusCooking},
+		OrderStatusCooking:   {OrderStatusCancelled, OrderStatusReady},
+		OrderStatusReady:     {OrderStatusDelivered, OrderStatusCancelled},
+		OrderStatusDelivered: {OrderStatusCompleted},
+	}
+
+	allowedStatuses, exists := transitions[o.Status]
+	if !exists {
+		return false
+	}
+
+	for _, allowed := range allowedStatuses {
 		if allowed == newStatus {
 			return true
 		}
 	}
 
 	return false
+}
+
+func (o *Order) IsFinal() bool {
+	return o.Status == OrderStatusCompleted || o.Status == OrderStatusCancelled
+}
+
+func (o *Order) CanBeCancelled() bool {
+	return !o.IsFinal()
 }
