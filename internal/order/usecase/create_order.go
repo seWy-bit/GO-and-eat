@@ -6,11 +6,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/seWy-bit/GO-and-eat/internal/order/domain"
-	"github.com/seWy-bit/GO-and-eat/internal/order/storage"
 	restaurantDomain "github.com/seWy-bit/GO-and-eat/internal/restaurant/domain"
-	restaurantStorage "github.com/seWy-bit/GO-and-eat/internal/restaurant/storage"
 )
 
 type CreateOrderInput struct {
@@ -26,60 +23,50 @@ type OrderItemInput struct {
 }
 
 type CreateOrderUseCase struct {
-	orderStorage      *storage.PostgresOrderStorage
-	restaurantStorage *restaurantStorage.PostgresStorage
-	db                *pgxpool.Pool
+	orderCreator   OrderCreator
+	menuGetter     MenuGetter
+	stockChecker   StockChecker
+	stockDecreaser StockDecreaser
+	txManager      TransactionManager
 }
 
 func NewCreateOrderUseCase(
-	orderStorage *storage.PostgresOrderStorage,
-	restaurantStorage *restaurantStorage.PostgresStorage,
-	db *pgxpool.Pool,
+	orderCreator OrderCreator,
+	menuGetter MenuGetter,
+	stockChecker StockChecker,
+	stockDecreaser StockDecreaser,
+	txManager TransactionManager,
 ) *CreateOrderUseCase {
 	return &CreateOrderUseCase{
-		orderStorage:      orderStorage,
-		restaurantStorage: restaurantStorage,
-		db:                db,
+		orderCreator:   orderCreator,
+		menuGetter:     menuGetter,
+		stockChecker:   stockChecker,
+		stockDecreaser: stockDecreaser,
+		txManager:      txManager,
 	}
 }
 
 func (uc *CreateOrderUseCase) Execute(ctx context.Context, input CreateOrderInput) (*domain.Order, error) {
-	tx, err := uc.db.Begin(ctx)
+	if input.ID == "" {
+		return nil, errors.New("id is required")
+	}
+	if input.UserID == "" {
+		return nil, errors.New("user_id is required")
+	}
+	if input.RestaurantID == "" {
+		return nil, errors.New("restaurant_id is required")
+	}
+	if len(input.Items) == 0 {
+		return nil, errors.New("items are required")
+	}
+
+	tx, err := uc.txManager.Begin(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to begin transaction: %w", err)
 	}
-	defer tx.Rollback(ctx)
+	defer uc.txManager.Rollback(tx)
 
-	var checkItems []struct {
-		ID       string
-		Quantity int
-	}
-	for _, item := range input.Items {
-		checkItems = append(checkItems, struct {
-			ID       string
-			Quantity int
-		}{
-			ID:       item.MenuItemID,
-			Quantity: item.Quantity,
-		})
-	}
-
-	available, err := uc.restaurantStorage.CheckAvailabilityWithTx(ctx, tx, input.RestaurantID, checkItems)
-	if err != nil {
-		return nil, fmt.Errorf("failed to check availability: %w", err)
-	}
-	if !available {
-		return nil, errors.New("not enough stock for one or more items")
-	}
-
-	for _, item := range input.Items {
-		err = uc.restaurantStorage.DecreaseStockWithTx(ctx, tx, input.RestaurantID, item.MenuItemID, item.Quantity)
-		if err != nil {
-			return nil, fmt.Errorf("failed to decrease stock for %s: %w", item.MenuItemID, err)
-		}
-	}
-
-	menu, err := uc.restaurantStorage.GetMenu(input.RestaurantID)
+	menu, err := uc.menuGetter.GetMenu(input.RestaurantID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get menu: %w", err)
 	}
@@ -87,6 +74,28 @@ func (uc *CreateOrderUseCase) Execute(ctx context.Context, input CreateOrderInpu
 	menuMap := make(map[string]restaurantDomain.MenuItem)
 	for _, item := range menu {
 		menuMap[item.ID] = item
+	}
+
+	checkItems := make([]struct {
+		ID       string
+		Quantity int
+	}, len(input.Items))
+	for i, item := range input.Items {
+		checkItems[i] = struct {
+			ID       string
+			Quantity int
+		}{
+			ID:       item.MenuItemID,
+			Quantity: item.Quantity,
+		}
+	}
+
+	available, err := uc.stockChecker.CheckAvailabilityWithTx(ctx, tx, input.RestaurantID, checkItems)
+	if err != nil {
+		return nil, fmt.Errorf("failed to check availability: %w", err)
+	}
+	if !available {
+		return nil, errors.New("not enough stock for one or more items")
 	}
 
 	var orderItems []domain.OrderItem
@@ -106,6 +115,10 @@ func (uc *CreateOrderUseCase) Execute(ctx context.Context, input CreateOrderInpu
 		})
 
 		totalAmount += int64(reqItem.Quantity) * menuItem.Price
+
+		if err := uc.stockDecreaser.DecreaseStockWithTx(ctx, tx, input.RestaurantID, reqItem.MenuItemID, reqItem.Quantity); err != nil {
+			return nil, fmt.Errorf("failed to decrease stock for %s: %w", reqItem.MenuItemID, err)
+		}
 	}
 
 	now := time.Now()
@@ -120,11 +133,11 @@ func (uc *CreateOrderUseCase) Execute(ctx context.Context, input CreateOrderInpu
 		UpdatedAt:    now,
 	}
 
-	if err := uc.orderStorage.CreateOrderWithTx(ctx, tx, order); err != nil {
+	if err := uc.orderCreator.CreateOrderWithTx(ctx, tx, order); err != nil {
 		return nil, fmt.Errorf("failed to save order: %w", err)
 	}
 
-	if err = tx.Commit(ctx); err != nil {
+	if err = uc.txManager.Commit(tx); err != nil {
 		return nil, fmt.Errorf("failed to commit transcation: %w", err)
 	}
 

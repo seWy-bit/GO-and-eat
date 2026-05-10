@@ -6,16 +6,17 @@ import (
 	"fmt"
 
 	"github.com/seWy-bit/GO-and-eat/internal/order/domain"
-	"github.com/seWy-bit/GO-and-eat/internal/order/storage"
 )
 
 type UpdateOrderStatusUseCase struct {
-	orderStorage *storage.PostgresOrderStorage
+	orderGetter  OrderGetter
+	orderUpdater OrderStatusUpdater
 }
 
-func NewUpdateOrderStatusUseCase(orderStorage *storage.PostgresOrderStorage) *UpdateOrderStatusUseCase {
+func NewUpdateOrderStatusUseCase(orderGetter OrderGetter, orderUpdater OrderStatusUpdater) *UpdateOrderStatusUseCase {
 	return &UpdateOrderStatusUseCase{
-		orderStorage: orderStorage,
+		orderGetter:  orderGetter,
+		orderUpdater: orderUpdater,
 	}
 }
 
@@ -28,7 +29,7 @@ func (uc *UpdateOrderStatusUseCase) Execute(ctx context.Context, id string, newS
 		return errors.New("status is required")
 	}
 
-	order, err := uc.orderStorage.GetOrder(ctx, id)
+	order, err := uc.orderGetter.GetOrder(ctx, id)
 	if err != nil {
 		return err
 	}
@@ -37,7 +38,7 @@ func (uc *UpdateOrderStatusUseCase) Execute(ctx context.Context, id string, newS
 		return fmt.Errorf("invalid status transition: %s -> %s", order.Status, newStatus)
 	}
 
-	if err = uc.orderStorage.UpdateOrderStatus(ctx, id, newStatus); err != nil {
+	if err = uc.orderUpdater.UpdateOrderStatus(ctx, id, newStatus); err != nil {
 		return err
 	}
 

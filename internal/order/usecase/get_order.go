@@ -5,16 +5,15 @@ import (
 	"errors"
 
 	"github.com/seWy-bit/GO-and-eat/internal/order/domain"
-	"github.com/seWy-bit/GO-and-eat/internal/order/storage"
 )
 
 type GetOrderUseCase struct {
-	orderStorage *storage.PostgresOrderStorage
+	orderGetter OrderGetter
 }
 
-func NewGetOrderUseCase(orderStorage *storage.PostgresOrderStorage) *GetOrderUseCase {
+func NewGetOrderUseCase(orderGetter OrderGetter) *GetOrderUseCase {
 	return &GetOrderUseCase{
-		orderStorage: orderStorage,
+		orderGetter: orderGetter,
 	}
 }
 
@@ -23,7 +22,7 @@ func (uc *GetOrderUseCase) Execute(ctx context.Context, id string) (*domain.Orde
 		return nil, errors.New("order id is required")
 	}
 
-	order, err := uc.orderStorage.GetOrder(ctx, id)
+	order, err := uc.orderGetter.GetOrder(ctx, id)
 	if err != nil {
 		return nil, err
 	}

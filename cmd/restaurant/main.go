@@ -59,10 +59,12 @@ func main() {
 	restaurantStore := restaurantStorage.NewPostgresStorage(pool.Pool)
 	restaurantHandlers := restaurantHandler.NewRestaurantHandler(restaurantStore)
 
+	txAdapter := database.NewTxAdapter(pool.Pool)
+
 	orderStore := orderStorage.NewPostgresOrderStorage(pool.Pool)
-	createOrderUseCase := orderUsecase.NewCreateOrderUseCase(orderStore, restaurantStore, pool.Pool)
+	createOrderUseCase := orderUsecase.NewCreateOrderUseCase(orderStore, restaurantStore, restaurantStore, restaurantStore, txAdapter)
 	getOrderUseCase := orderUsecase.NewGetOrderUseCase(orderStore)
-	updateOrderStatusUseCase := orderUsecase.NewUpdateOrderStatusUseCase(orderStore)
+	updateOrderStatusUseCase := orderUsecase.NewUpdateOrderStatusUseCase(orderStore, orderStore)
 	getUserOrdersUseCase := orderUsecase.NewGetUserOrdersUseCase(orderStore)
 
 	orderHandlers := orderHandler.NewOrderHandler(
