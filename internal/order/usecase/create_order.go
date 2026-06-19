@@ -76,6 +76,12 @@ func (uc *CreateOrderUseCase) Execute(ctx context.Context, input CreateOrderInpu
 		menuMap[item.ID] = item
 	}
 
+	for _, reqItem := range input.Items {
+		if _, exists := menuMap[reqItem.MenuItemID]; !exists {
+			return nil, fmt.Errorf("menu item not found: %s", reqItem.MenuItemID)
+		}
+	}
+
 	checkItems := make([]struct {
 		ID       string
 		Quantity int
@@ -102,10 +108,7 @@ func (uc *CreateOrderUseCase) Execute(ctx context.Context, input CreateOrderInpu
 	var totalAmount int64
 
 	for _, reqItem := range input.Items {
-		menuItem, exists := menuMap[reqItem.MenuItemID]
-		if !exists {
-			return nil, errors.New("menu item not found: " + reqItem.MenuItemID)
-		}
+		menuItem := menuMap[reqItem.MenuItemID]
 
 		orderItems = append(orderItems, domain.OrderItem{
 			MenuItemID: menuItem.ID,
