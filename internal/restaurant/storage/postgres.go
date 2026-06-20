@@ -23,7 +23,7 @@ func (s *PostgresStorage) CreateRestaurant(r domain.Restaurant) error {
 	ctx := context.Background()
 
 	query := `
-		INSERT INTO restaurants (id, name, adress, phone, created_at)
+		INSERT INTO restaurants (id, name, address, phone, created_at)
 		VALUES ($1, $2, $3, $4, $5)
 	`
 
