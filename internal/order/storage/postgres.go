@@ -38,8 +38,8 @@ func (s *PostgresOrderStorage) CreateOrderWithTx(ctx context.Context, tx pgx.Tx,
 	}
 
 	itemQuery := `
-		INSERT INTO order_items (id, order_id, menu_item_id, quantity, price)
-		VALUES ($1, $2, $3, $4, $5)
+		INSERT INTO order_items (id, order_id, menu_item_id, name, quantity, price)
+		VALUES ($1, $2, $3, $4, $5, $6)
 	`
 
 	for _, item := range order.Items {
@@ -49,6 +49,7 @@ func (s *PostgresOrderStorage) CreateOrderWithTx(ctx context.Context, tx pgx.Tx,
 			itemID,
 			order.ID,
 			item.MenuItemID,
+			item.Name,
 			item.Quantity,
 			item.Price,
 		)
@@ -70,7 +71,7 @@ func (s *PostgresOrderStorage) GetOrder(ctx context.Context, id string) (domain.
 	var order domain.Order
 	var statusStr string
 
-	err := s.pool.QueryRow(ctx, orderQuery).Scan(
+	err := s.pool.QueryRow(ctx, orderQuery, id).Scan(
 		&order.ID,
 		&order.UserID,
 		&order.RestaurantID,
